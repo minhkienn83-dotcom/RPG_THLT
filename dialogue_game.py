@@ -2,6 +2,9 @@ import os
 import time
 import sys
 
+# Đảm bảo in tiếng Việt không bị lỗi Unicode
+sys.stdout.reconfigure(encoding='utf-8')
+
 # --- BƯỚC 1: ĐỊNH NGHĨA Ô-TÔ-MÁT (FA) BẰNG DICTIONARY ---
 # Ở đây FA được định nghĩa bởi:
 # Q: Tập các trạng thái (TRUNG_LAP, TO_MO, NGHI_NGO, THAN_THIEN, TUC_GIAN, CHO_PHEP_QUA, TRUC_XUAT)

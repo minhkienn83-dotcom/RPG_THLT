@@ -10,6 +10,7 @@ class BaseEnemy(pygame.sprite.Sprite):
         super().__init__()
         
         # 1. Thông số cơ bản
+        self.max_health = 100
         self.health = 100
         self.walk_speed = 1
         self.run_speed = 2
@@ -40,6 +41,10 @@ class BaseEnemy(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=(x, y))
 
     def update(self, player_pos):
+        if self.current_state == "DEAD":
+            self.animate() # Chỉ chạy animation chết
+            return
+            
         # Lưu trạng thái cũ để kiểm tra chuyển đổi
         old_state = self.current_state
         
@@ -105,6 +110,32 @@ class BaseEnemy(pygame.sprite.Sprite):
             else:
                 self.show_alert = False
 
+    def take_damage(self, amount):
+        if self.current_state != "DEAD":
+            self.health -= amount
+            if self.health <= 0:
+                self.health = 0
+                self.fsm.compute_next_state(0, self.health)
+                self.current_state = self.fsm.get_current_state()
+                self.frame_index = 0 # reset animation
+
+    def draw_health_bar(self, screen):
+        if self.current_state != "DEAD":
+            # Chiều rộng thanh máu gốc
+            bar_width = 40
+            bar_height = 5
+            # Vị trí trên đầu
+            x = self.rect.centerx - bar_width // 2
+            y = self.rect.top - 10
+            
+            # Tính tỉ lệ máu
+            health_ratio = max(0, self.health) / self.max_health
+            current_bar_width = int(bar_width * health_ratio)
+            
+            # Vẽ nền đỏ, máu xanh lá
+            pygame.draw.rect(screen, (255, 0, 0), (x, y, bar_width, bar_height))
+            pygame.draw.rect(screen, (0, 255, 0), (x, y, current_bar_width, bar_height))
+                
 # --- CÁC LOẠI KẺ ĐỊCH CỤ THỂ ---
 
 class Minion(BaseEnemy):
@@ -121,3 +152,37 @@ class Scout(BaseEnemy):
         self.run_speed = 4
         # Bạn có thể điều chỉnh tỉ lệ kích thước để phân biệt Scout
         self.image = pygame.transform.scale(self.image, (40, 40))
+
+class Guardian(BaseEnemy):
+    def __init__(self, x, y):
+        # Dùng hình ảnh của scout nhưng nhân đôi kích thước cho to hơn
+        super().__init__(x, y, "assets/graphics/scout.png", 7, 5) 
+        self.max_health = 300
+        self.health = 300 # Boss trâu hơn
+        self.walk_speed = 1
+        self.run_speed = 3
+        
+        # Scale up tất cả các frame của Boss để trông bự và nguy hiểm hơn
+        for state in self.animations:
+            new_frames = []
+            for frame in self.animations[state]:
+                # Phóng to mỗi frame lên gấp 2
+                w, h = frame.get_size()
+                big_frame = pygame.transform.scale(frame, (w * 2, h * 2))
+                new_frames.append(big_frame)
+            self.animations[state] = new_frames
+            
+        self.image = self.animations[self.current_state][0]
+        self.rect = self.image.get_rect(center=(x, y))
+        self.is_hostile = False # Ban đầu có thể không đuổi theo
+
+    def update(self, player_pos):
+        if not self.is_hostile:
+            # Nếu chưa Hostile thì đứng im (IDLE) - tạm ép IDLE bằng row Walk
+            self.current_state = "PATROL"
+            self.animate()
+            return
+        super().update(player_pos)
+        
+    def animate(self):
+        super().animate()

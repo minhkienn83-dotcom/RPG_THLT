@@ -1,54 +1,39 @@
 import pygame
 import sys
 from src.core.settings import *
-from src.entities.enemy import Minion, Scout 
-from src.core.ui import UI
+from src.core.scene_manager import SceneManager
+from src.scenes.scene_1 import Scene1
+from src.scenes.scene_2 import Scene2
+from src.scenes.scene_3 import Scene3
 
 # Khởi tạo Pygame
 pygame.init()
+pygame.font.init() # Khởi tạo font
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("FSM Hunter - CTU Automata Project")
+pygame.display.set_caption("FSM Dungeon RPG - CTU Automata Project")
 clock = pygame.time.Clock()
-ui_manager = UI(screen)
 
-# Khởi tạo nhóm kẻ địch
-enemies = pygame.sprite.Group()
-enemies.add(Minion(200, 300))
-enemies.add(Scout(600, 150))
-enemies.add(Minion(400, 500)) # Thêm thêm 1 con nữa cho vui mắt
+# Quản lý Màn Chơi
+scene_manager = SceneManager()
+scene_manager.add_scene("Scene1", Scene1(scene_manager))
+scene_manager.add_scene("Scene2", Scene2(scene_manager))
+scene_manager.add_scene("Scene3", Scene3(scene_manager))
 
-player_hp = 100
+# Khởi chạy màn đầu tiên
+scene_manager.switch_scene("Scene1")
 
 while True:
-    # 1. Xử lý sự kiện
-    for event in pygame.event.get():
+    events = pygame.event.get()
+    for event in events:
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
 
-    # 2. Cập nhật logic
-    # Mouse_pos đóng vai trò là vị trí của Player để test FSM
-    mouse_pos = pygame.mouse.get_pos()
-    enemies.update(mouse_pos) 
+    # Cập nhật logic màn hiện tại
+    scene_manager.update(events)
 
-    # 3. Vẽ Scene
-    screen.fill((40, 40, 40)) # Nền tối trung tính
-    
-    # Vẽ các thực thể (Nhân vật)
-    enemies.draw(screen)
-    
-    # --- ĐIỂM CẦN BỔ SUNG: Vẽ Alert (Dấu !) cho từng kẻ địch ---
-    for enemy in enemies:
-        enemy.draw_alert(screen)
-    
-    # 4. Vẽ HUD và Giao diện lớp trên cùng
-    if len(enemies.sprites()) > 0:
-        # Chọn kẻ địch gần chuột nhất hoặc kẻ địch đầu tiên để hiển thị trạng thái FSM
-        first_enemy = enemies.sprites()[0]
-        ui_manager.draw_hud(player_hp, first_enemy.fsm)
-        
-        # Nếu muốn xem vòng tròn logic khi debug, hãy bỏ comment dòng dưới
-        # ui_manager.draw_debug_info(first_enemy)
+    # Vẽ Màn Hình
+    scene_manager.draw(screen)
 
     pygame.display.flip()
     clock.tick(FPS)
