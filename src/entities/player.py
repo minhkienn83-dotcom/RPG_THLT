@@ -1,7 +1,7 @@
 import pygame
 import math
 from src.core.settings import *
-from src.core.utils import load_spritesheet
+from src.core.utils import load_spritesheet, load_individual_sprites
 
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, x, y, target_x, target_y):
@@ -35,16 +35,24 @@ class Bullet(pygame.sprite.Sprite):
 class Player(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
-        # Load sprite cho Player (Tạm lấy minion.png làm mẫu nhân vật)
-        self.all_frames = load_spritesheet("assets/graphics/minion.png", 7, 7)
+        
+        p1 = "assets/graphics/Main close attack/Individual Sprites"
+        p2 = "assets/graphics/Main range attack/Individual Sprites"
         self.animations = {
-            "IDLE": self.all_frames[0],   # Row 0 (Tùy spritesheet thực tế)
-            "RUN":  self.all_frames[1],   # Row Walk/Run 
-            "ATTACK": self.all_frames[4], # Dòng Jump/Attack
+            "IDLE": load_individual_sprites(p1, "adventurer-idle-0", scale=2),
+            "RUN":  load_individual_sprites(p1, "adventurer-run-0", scale=2),
+            "ATTACK_MELEE": load_individual_sprites(p1, "adventurer-attack1-0", scale=2),
+            "ATTACK_RANGED": load_individual_sprites(p2, "adventurer-bow-0", scale=2),
         }
+        
+        # Cứu hộ an toàn nếu thiếu file
+        for k in self.animations:
+            if not self.animations[k]:
+                self.animations[k] = [pygame.Surface((50,50), pygame.SRCALPHA)]
+        
         self.current_state = "IDLE"
         self.frame_index = 0
-        self.animation_speed = 0.15
+        self.animation_speed = 0.25
         self.image = self.animations[self.current_state][int(self.frame_index)]
         
         self.rect = self.image.get_rect(center=(x, y))
@@ -119,9 +127,12 @@ class Player(pygame.sprite.Sprite):
         if self.attack_cooldown <= 0:
             self.is_attacking = True
             self.is_melee = is_melee
-            self.current_state = "ATTACK"
+            self.current_state = "ATTACK_MELEE" if is_melee else "ATTACK_RANGED"
             self.frame_index = 0
-            self.attack_cooldown = 15 # Fix bắn nhanh hơn để dễ chơi
+            
+            # Khóa tốc độ cooldown theo thời gian render animation
+            frames_count = len(self.animations[self.current_state])
+            self.attack_cooldown = int(frames_count / self.animation_speed) - 2
             
             mx, my = pygame.mouse.get_pos()
             # Đổi hướng nhân vật theo con trỏ chuột
@@ -129,7 +140,7 @@ class Player(pygame.sprite.Sprite):
             else: self.direction_x = 1
             
             if not is_melee:
-                # Bắn đạn
+                # Bắn đạn, chỉnh offset mũi cung tí xíu
                 bullet = Bullet(self.rect.centerx, self.rect.centery, mx, my)
                 bullets_group.add(bullet)
 
@@ -138,11 +149,13 @@ class Player(pygame.sprite.Sprite):
             self.attack_cooldown -= 1
 
     def draw(self, screen):
-        screen.blit(self.image, self.rect)
-        # Vẽ hitbox tấn công nếu đang đánh cận chiến
+        # Tọa độ vẽ chuẩn tâm player
+        draw_rect = self.image.get_rect(center=self.rect.center)
+        screen.blit(self.image, draw_rect)
+        
+        # Chỉ lấy hitbox xử lý logic, không vẽ khung đỏ ra màn hình nữa
         if self.is_attacking and self.is_melee:
             attack_rect = self.get_attack_rect()
-            pygame.draw.rect(screen, (255, 0, 0), attack_rect, 2) # Xung quanh để gỡ lỗi màu đỏ
 
     def get_attack_rect(self):
         mouse_x, mouse_y = pygame.mouse.get_pos()
