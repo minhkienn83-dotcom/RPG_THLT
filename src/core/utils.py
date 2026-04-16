@@ -16,6 +16,7 @@ def load_spritesheet(filename, rows, cols):
             rect = pygame.Rect(c * frame_width, r * frame_height, frame_width, frame_height)
             # Cắt ảnh con từ ảnh gốc
             frame = sheet.subsurface(rect)
+            row_frames.append(frame)
         sprites.append(row_frames)
     return sprites
 
@@ -27,21 +28,32 @@ def load_spritesheet_auto(filename, scale=2, frame_config=None):
     # Tính số frames hoặc frame_width
     frame_width = None
     
-    # 1. Thử đọc từ config hardcode (chỉ dùng cho các frame dị dạng)
+    # 1. Thử đọc từ config hardcode (định nghĩa số frames hoặc width tùy trường hợp)
     base = os.path.basename(filename)
     if frame_config and base in frame_config:
         frames = frame_config[base]
-        frame_width = w // frames
-    
+        if isinstance(frames, int) and frames > 0:
+            frame_width = w / frames
+            if w % frames != 0:
+                frame_width = int(round(frame_width))
+                print(f"Warning: {base} width {w} không chia hết cho {frames}, dùng frame_width={frame_width}")
+            else:
+                frame_width = int(frame_width)
+
     # 2. Thử đọc từ số đuôi _stripXX trong tên file
-    if not frame_width:
+    if frame_width is None:
         match = re.search(r'_strip(\d+)', base)
         if match:
             frames = int(match.group(1))
-            frame_width = w // frames
+            frame_width = w / frames
+            if w % frames != 0:
+                frame_width = int(round(frame_width))
+                print(f"Warning: {base} width {w} không chia hết cho {frames}, dùng frame_width={frame_width}")
+            else:
+                frame_width = int(frame_width)
             
     # 3. Mặc định Fallback (Đoán bằng width chia đều nhưng phải hợp lý)
-    if not frame_width:
+    if frame_width is None:
         # Nếu chiều dọc chia hết
         if w % h == 0:
             frame_width = h

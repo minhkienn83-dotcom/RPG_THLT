@@ -7,7 +7,7 @@ from src.core.settings import *
 
 # Cấu hình width thủ công cho những dải strip đặc biệt rách / không chuẩn
 ENEMY_FRAME_CONFIG = {
-    'spr_ArcherAttack_strip_NoBkg.png': 18,
+    'spr_ArcherAttack_strip_NoBkg.png': 10,
     'spr_ArcherDash_strip_NoBkg.png': 14,
     'spr_ArcherDeath_strip_NoBkg.png': 24,
     'spr_ArcherIdle_strip_NoBkg.png': 8,
@@ -146,6 +146,7 @@ class Archer(BaseEnemy):
         
         self.direction_x = 1 if dx > 0 else -1
         
+        old_state = self.current_state
         if self.attack_cooldown > 0:
             self.attack_cooldown -= 1
             
@@ -162,6 +163,9 @@ class Archer(BaseEnemy):
             self.rect.y += (dy / dist) * self.run_speed
         else:
             self.current_state = "IDLE"
+
+        if self.current_state != old_state:
+            self.frame_index = 0
             
         # Animate
         frames = self.animations[self.current_state]
@@ -210,6 +214,7 @@ class CloseRanger(BaseEnemy):
         if dist > 0:
             self.direction_x = 1 if dx > 0 else -1
         
+        old_state = self.current_state
         if dist < self.attack_range:
             self.current_state = "ATTACK"
         elif dist < 600:
@@ -219,6 +224,9 @@ class CloseRanger(BaseEnemy):
         else:
             self.current_state = "IDLE"
             
+        if self.current_state != old_state:
+            self.frame_index = 0
+
         frames = self.animations[self.current_state]
         self.frame_index += self.animation_speed
         if self.frame_index >= len(frames): self.frame_index = 0
@@ -234,6 +242,8 @@ class Gatekeeper(BaseEnemy):
         super().__init__(x, y)
         self.max_health = 400
         self.health = 400
+        self.is_dead = False # Thêm biến này để đánh dấu đã chết hẳn chưa
+        self.death_animation_finished = False # Đánh dấu đã chạy xong animation chết chưa
         self.run_speed = 1.0
         p = "assets/graphics/Gatekeeper/Necromancer/"
         self.animations = {
@@ -253,11 +263,35 @@ class Gatekeeper(BaseEnemy):
                 self.animations[k] = [pygame.Surface((50,50), pygame.SRCALPHA)]
         
     def update(self, player_pos, enemy_bullets=None, is_waiting=False):
+        # 1. Nếu đã chết hẳn (xong animation chết), dừng mọi xử lý logic
+        if hasattr(self, 'death_animation_finished') and self.death_animation_finished:
+            return
+
+        # 2. Kiểm tra máu để chuyển sang trạng thái DEAD (Chỉ chạy 1 lần duy nhất)
+        # Giả sử bạn đã đổi tên biến thành .health như đã thống nhất
+        if hasattr(self, 'health') and self.health <= 0:
+            if self.current_state != "DEAD":
+                self.current_state = "DEAD"
+                self.frame_index = 0  # Reset để chạy animation chết từ đầu
+            
+            # Xử lý chạy animation chết
+            frames = self.animations["DEAD"]
+            self.frame_index += self.animation_speed
+            
+            if self.frame_index >= len(frames):
+                self.frame_index = len(frames) - 1 # Dừng ở frame cuối
+                self.death_animation_finished = True
+                # self.kill() # Bỏ comment nếu muốn boss biến mất hẳn sau khi chết
+            
+            # Cập nhật hình ảnh chết và thoát hàm (không chạy logic di chuyển nữa)
+            self.image = self.animations["DEAD"][int(self.frame_index)]
+            if self.direction_x == -1:
+                self.image = pygame.transform.flip(self.image, True, False)
+            return
+
+        # 3. Logic khi Boss còn sống
         if not self.is_hostile or is_waiting:
             self.current_state = "IDLE"
-        elif self.current_state == "DEAD":
-            if int(self.frame_index) < len(self.animations["DEAD"]) - 1:
-                self.frame_index += self.animation_speed
         else:
             # Boss chầm chậm đi tới
             dx = player_pos[0] - self.rect.centerx
@@ -272,13 +306,17 @@ class Gatekeeper(BaseEnemy):
                 if dist > 0:
                     self.rect.x += (dx / dist) * self.run_speed
                     self.rect.y += (dy / dist) * self.run_speed
-                
+        
+        # 4. Cập nhật Animation cho các trạng thái bình thường (IDLE, CHASE, ATTACK)
         frames = self.animations[self.current_state]
         self.frame_index += self.animation_speed
-        if self.frame_index >= len(frames): self.frame_index = 0
+        
+        if self.frame_index >= len(frames): 
+            self.frame_index = 0
+            
         img = frames[int(self.frame_index)]
         
-        # Vẽ tâm đúng y gốc cũ
+        # 5. Vẽ và giữ đúng tâm (Rect)
         old_center = self.rect.center
         self.image = pygame.transform.flip(img, True, False) if self.direction_x == -1 else img
         self.rect = self.image.get_rect(center=old_center)
